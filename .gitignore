@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Runtime data: database, master key, encrypted blobs
+backend/data/
+backend/storage/
+
+# TLS material (private keys must never be committed)
+certs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Captures, key logs and generated results
+*.pcap
+*.pcapng
+sslkeys*.log
+evaluation/results/
+demo_files/

@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+python-multipart
+argon2-cffi
+cryptography

@@ -1,0 +1,1559 @@
+# Product Requirements Document (PRD)
+
+## Project Title
+
+**Secure Company Intranet — Controlled Internal Communication and Secure File Sharing Platform**
+
+## 1. Product Overview
+
+The Secure Company Intranet is a private internal communication and file-sharing platform designed for organizations to securely exchange text, documents, and images between authenticated company employees.
+
+The system is intended to operate within a controlled company network and prevent unauthorized external access. Users are organized into company profiles and assigned roles such as Administrator, Developer, HR, Finance, or other organization-defined roles.
+
+The platform provides:
+
+- Secure user authentication
+- Role-based access control
+- Controlled company-only communication
+- Text communication
+- Document and image sharing
+- Secure file storage and transfer
+- File type and content validation
+- Integrity verification
+- Multi-device compatibility across PC and mobile
+- Session management
+- Network traffic analysis
+- PCAP-to-SQLite analysis
+- Security auditing and monitoring
+
+The system is designed as both a usable intranet application and a cybersecurity analysis platform.
+
+---
+
+# 2. Problem Statement
+
+Organizations frequently need to exchange internal documents, images, and messages between employees without exposing company information to external users or uncontrolled communication platforms.
+
+A secure company intranet should ensure that:
+
+1. Only authorized company users can access the system.
+2. Users can only access resources they are authorized to access.
+3. Shared files cannot be silently modified during transmission or storage.
+4. Uploaded files are actually of the permitted type and are not disguised as another format.
+5. User sessions are controlled across multiple devices.
+6. The system works consistently across desktop and mobile devices.
+7. Network communication can be monitored and analyzed for security events.
+8. User actions can be traced for accountability.
+
+---
+
+# 3. Product Goals
+
+## Primary Goals
+
+### G1 — Company-only access
+
+The system must restrict access to authenticated users belonging to the organization.
+
+### G2 — Secure communication
+
+Users must be able to exchange internal text, documents, and images through the intranet.
+
+### G3 — Strong authentication
+
+Users must authenticate using company-managed profiles and securely hashed passwords.
+
+### G4 — Controlled sessions
+
+Each user may have a maximum of **two active device sessions**.
+
+### G5 — File integrity
+
+The system must verify that a received/shared file is identical to the file that was originally uploaded and authorized.
+
+### G6 — File authenticity/type validation
+
+The system must verify uploaded files using:
+
+- File extension
+- MIME type
+- File signature/magic bytes
+
+### G7 — Cross-device compatibility
+
+The platform must be usable from both:
+
+- Desktop/PC
+- Mobile/phone
+
+### G8 — Security monitoring
+
+The system must capture and analyze network traffic using:
+
+- Wireshark
+- PyShark
+- PCAP analysis
+
+### G9 — Security evidence
+
+Network traffic metadata must be convertible from PCAP into SQLite for structured analysis and reporting.
+
+---
+
+# 4. Non-Goals
+
+The initial version will NOT attempt to provide:
+
+- Public social networking
+- External/public file sharing
+- Anonymous accounts
+- Personal email functionality
+- Cloud-based public file links
+- General-purpose internet communication
+- End-to-end communication with users outside the organization
+- Router or Wi-Fi penetration testing
+- USB forensics
+- Windows memory forensics
+- Reverse engineering
+
+These can be considered future extensions but are outside the core product.
+
+---
+
+# 5. Target Users
+
+## 5.1 Administrator
+
+Responsible for:
+
+- Creating users
+- Disabling users
+- Assigning roles
+- Managing permissions
+- Monitoring sessions
+- Viewing security logs
+- Reviewing security alerts
+- Managing allowed file types
+
+## 5.2 Developer / Employee
+
+Responsible for:
+
+- Logging into the intranet
+- Sending text
+- Sharing authorized documents
+- Sharing images
+- Receiving files
+- Viewing permitted resources
+
+## 5.3 Additional Role Types
+
+The system should support configurable roles such as:
+
+- HR
+- Finance
+- Developer
+- Manager
+- IT
+- Administrator
+
+The exact roles should be configurable rather than hard-coded.
+
+---
+
+# 6. System Architecture
+
+```text
+                         COMPANY NETWORK
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+          ▼                   ▼                   ▼
+     PC / Laptop          PC / Laptop          Mobile
+      Employee A           Employee B         Employee C
+          │                   │                   │
+          └───────────────────┼───────────────────┘
+                              │
+                         HTTPS / TLS
+                              │
+                              ▼
+                  ┌────────────────────────┐
+                  │   INTRANET SERVER     │
+                  │                        │
+                  │ Authentication         │
+                  │ Authorization          │
+                  │ Session Management     │
+                  │ Messaging              │
+                  │ File Sharing           │
+                  │ Type Detection         │
+                  │ Integrity Verification│
+                  │ Audit Logging           │
+                  └───────────┬────────────┘
+                              │
+             ┌────────────────┼────────────────┐
+             │                │                │
+             ▼                ▼                ▼
+        User Database     File Storage     Audit Logs
+             │
+             │
+             ▼
+      ┌─────────────────┐
+      │ Traffic Capture │
+      │                 │
+      │ Wireshark       │
+      │ PyShark         │
+      └────────┬────────┘
+               │
+               ▼
+            PCAP
+               │
+               ▼
+      ┌─────────────────┐
+      │ PCAP Analyzer   │
+      │                 │
+      │ PyShark         │
+      └────────┬────────┘
+               │
+               ▼
+          SQLite DB
+               │
+               ▼
+       Security Dashboard
+```
+
+---
+
+# 7. Functional Requirements
+
+## FR-01 — User Registration
+
+Only an administrator can create company user accounts.
+
+Required information:
+
+- User ID
+- Name
+- Company profile
+- Department
+- Role
+- Password
+- Account status
+
+Public registration must not be available.
+
+---
+
+# 8. Authentication
+
+## FR-02 — Password Security
+
+Passwords must never be stored as plaintext.
+
+The system must use a strong password hashing algorithm such as:
+
+- Argon2id
+- bcrypt
+
+The database should store only the password hash and associated parameters.
+
+---
+
+## FR-03 — Login
+
+A user must provide valid credentials to access the platform.
+
+Authentication flow:
+
+```text
+Username + Password
+        ↓
+Password Hash Verification
+        ↓
+User Account Check
+        ↓
+Role/Permission Retrieval
+        ↓
+Session Creation
+```
+
+Invalid credentials must result in access denial.
+
+---
+
+# 9. Session Management
+
+## FR-04 — Two-device Session Limit
+
+Each user can have a maximum of **two active sessions**.
+
+Example:
+
+```text
+User A
+
+Laptop       → Session 1 ✓
+Phone        → Session 2 ✓
+Tablet       → Session 3 ✗
+```
+
+When a third device attempts login, the system must either:
+
+- Reject the new session, or
+- Allow the user/admin to revoke an existing session.
+
+The selected behavior should be configurable.
+
+---
+
+## FR-05 — Session Expiration
+
+Sessions must expire after a configurable period.
+
+Example:
+
+```text
+Session lifetime = 8 hours
+```
+
+An expired session must require re-authentication.
+
+---
+
+## FR-06 — Inactivity Timeout
+
+A session must automatically expire after a configurable period of inactivity.
+
+Example:
+
+```text
+No activity for 30 minutes
+        ↓
+Session expired
+        ↓
+Login required
+```
+
+---
+
+## FR-07 — Session Revocation
+
+Users and administrators should be able to terminate active sessions.
+
+Administrators should be able to revoke all sessions for a user.
+
+---
+
+# 10. Role-Based Access Control
+
+## FR-08 — Role Management
+
+Every user must have a role.
+
+Example:
+
+```text
+Administrator
+Developer
+HR
+Finance
+Manager
+```
+
+Roles determine what actions a user can perform.
+
+---
+
+## FR-09 — Resource Authorization
+
+Authentication alone must not grant access to every resource.
+
+The system must check:
+
+```text
+Is the user authenticated?
+        ↓
+Is the user active?
+        ↓
+Is the user authorized for this resource?
+        ↓
+Allow / Deny
+```
+
+Example:
+
+```text
+Finance User
+      ↓
+Finance Report → ALLOW
+HR Confidential File → DENY
+```
+
+---
+
+# 11. Company-only Access
+
+## FR-10 — Internal Network Restriction
+
+The server should be configured to accept normal application traffic only from the organization's trusted network.
+
+Network-level restrictions should be combined with application authentication.
+
+The system must NOT rely on network location alone for authorization.
+
+---
+
+## FR-11 — External Access Prevention
+
+Requests from unauthorized external networks must be rejected.
+
+The system should log:
+
+- Source IP
+- Timestamp
+- Requested resource
+- Request type
+- Result
+
+Example:
+
+```text
+EXTERNAL ACCESS ATTEMPT
+
+Source: Unknown
+Resource: /files/company_report.pdf
+Result: BLOCKED
+Timestamp: 14:32:11
+```
+
+---
+
+# 12. Text Communication
+
+## FR-12 — Internal Text Messaging
+
+Authenticated users must be able to send text messages to authorized company users.
+
+Messages must include:
+
+- Sender
+- Recipient
+- Timestamp
+- Message content
+- Delivery status
+
+---
+
+# 13. Document and Image Sharing
+
+## FR-13 — File Sharing
+
+Users must be able to share authorized:
+
+- Documents
+- Images
+
+with other authorized company profiles.
+
+The system must associate each file with:
+
+- Sender
+- Recipient(s)
+- Timestamp
+- File name
+- File size
+- File type
+- Integrity hash
+- File version/status
+
+---
+
+# 14. File Type Detection
+
+## FR-14 — Allowed File Types
+
+The administrator must define allowed file types.
+
+Example:
+
+### Documents
+
+- PDF
+- DOCX
+- XLSX
+- PPTX
+- TXT
+
+### Images
+
+- JPG/JPEG
+- PNG
+- WEBP
+
+The allowed list must be configurable.
+
+---
+
+## FR-15 — Extension Validation
+
+The system must inspect the file extension.
+
+Example:
+
+```text
+report.pdf
+```
+
+The extension must correspond to an allowed format.
+
+However, extension validation alone must never be considered sufficient.
+
+---
+
+## FR-16 — MIME Type Validation
+
+The system must inspect the detected MIME type.
+
+Example:
+
+```text
+report.pdf
+        ↓
+application/pdf
+```
+
+The detected MIME type must match the expected format.
+
+---
+
+## FR-17 — File Signature / Magic Byte Validation
+
+The system must inspect the file's actual binary signature.
+
+This prevents simple extension spoofing.
+
+Example:
+
+```text
+malicious.exe
+        ↓
+renamed
+        ↓
+document.pdf
+```
+
+The system should detect that the underlying file signature does not represent a valid PDF and reject the file.
+
+---
+
+# 15. File Compatibility
+
+## FR-18 — Cross-device Compatibility
+
+The platform must provide a consistent experience across:
+
+- Windows/Linux/macOS PCs where supported by the browser
+- Android/iOS mobile devices through a responsive web interface
+
+The preferred implementation is a responsive web application rather than separate native applications.
+
+---
+
+## FR-19 — File Compatibility
+
+Before sharing a file, the system should verify:
+
+- Format
+- MIME type
+- File signature
+- Maximum size
+- Browser/device support
+
+Example:
+
+```text
+Upload
+  ↓
+Format Check
+  ↓
+MIME Check
+  ↓
+Magic Byte Check
+  ↓
+Size Check
+  ↓
+Compatibility Check
+  ↓
+Accept / Reject
+```
+
+---
+
+# 16. File Integrity
+
+## FR-20 — Integrity Hash
+
+A cryptographic hash must be calculated for each accepted file.
+
+Example:
+
+```text
+File
+ ↓
+SHA-256
+ ↓
+Hash
+```
+
+The hash is stored with the file metadata.
+
+---
+
+## FR-21 — Post-transfer Verification
+
+After a file is received/decrypted, the system must verify that the resulting file matches the original.
+
+Conceptually:
+
+```text
+Original File
+      ↓
+Encryption
+      ↓
+Transmission / Storage
+      ↓
+Decryption
+      ↓
+Recovered File
+      ↓
+SHA-256
+      ↓
+Compare with Original Hash
+```
+
+Expected result:
+
+```text
+Original Hash == Recovered Hash
+        ↓
+Integrity Verified ✓
+```
+
+If they differ:
+
+```text
+Original Hash != Recovered Hash
+        ↓
+Integrity Failure ✗
+```
+
+The event must be logged.
+
+---
+
+# 17. Encryption
+
+The system should use established cryptographic libraries rather than implementing cryptographic algorithms from scratch.
+
+Recommended approach:
+
+```text
+Application data
+       ↓
+Authenticated encryption
+       ↓
+TLS-secured transport
+       ↓
+Company network
+```
+
+For application-level file/message encryption, an authenticated encryption mode such as AES-GCM can be used.
+
+TLS should protect network communication.
+
+The system must never expose plaintext credentials or sensitive application data unnecessarily in captured network traffic.
+
+---
+
+# 18. Audit and Accountability
+
+## FR-22 — Audit Logging
+
+The system must maintain an audit trail for security-relevant actions.
+
+Events include:
+
+- Login
+- Failed login
+- Logout
+- Session creation
+- Session termination
+- File upload
+- File download
+- File share
+- Access denied
+- Integrity failure
+- Invalid file type
+- External access attempt
+- Administrative actions
+
+Example:
+
+```text
+Timestamp: 14:42:21
+User: employee_17
+Action: FILE_DOWNLOAD
+File: project_report.pdf
+Source Device: DEV-002
+Result: SUCCESS
+```
+
+Audit records should not expose sensitive file contents.
+
+---
+
+# 19. PCAP Analysis Module
+
+## FR-23 — PCAP Capture
+
+Network traffic generated by the intranet must be capable of being captured using Wireshark.
+
+The capture should include controlled project experiments such as:
+
+- Login
+- Text communication
+- File upload
+- File download
+- Failed authentication
+- Unauthorized access attempts
+
+---
+
+## FR-24 — PCAP → SQLite
+
+The system must provide a PCAP analysis pipeline.
+
+```text
+PCAP/PCAPNG
+     ↓
+PyShark
+     ↓
+Packet Extraction
+     ↓
+Filtering
+     ↓
+Feature Extraction
+     ↓
+SQLite
+```
+
+Relevant fields may include:
+
+- Timestamp
+- Source IP
+- Destination IP
+- Protocol
+- Source port
+- Destination port
+- Packet length
+- TCP flags
+- Connection information
+
+---
+
+# 20. Traffic Analysis
+
+## FR-25 — Wireshark Analysis
+
+Wireshark will be used for visual/manual analysis of network traffic.
+
+The project should demonstrate:
+
+### Before security controls
+
+What information can be observed from traffic without appropriate protection.
+
+### After security controls
+
+What information remains observable after TLS/application-level protection.
+
+The objective is to demonstrate the reduction of sensitive information exposure.
+
+---
+
+## FR-26 — PyShark Analysis
+
+PyShark will provide programmatic traffic analysis.
+
+The system should be capable of identifying patterns such as:
+
+- Repeated failed connections
+- Abnormally high request rates
+- Unexpected protocols
+- Unexpected ports
+- Large traffic bursts
+- Repeated authentication failures
+
+These should generate security events where appropriate.
+
+---
+
+# 21. Security Dashboard
+
+The system should provide an administrator dashboard containing:
+
+```text
+SECURITY DASHBOARD
+
+USERS
+Active users
+Active sessions
+Locked/disabled accounts
+
+SESSIONS
+Current sessions
+Device count
+Expired sessions
+
+FILES
+Uploads
+Downloads
+Rejected files
+Integrity failures
+
+NETWORK
+Packets analyzed
+Connections
+Failed connections
+Suspicious events
+
+SECURITY
+Failed logins
+Unauthorized requests
+External access attempts
+Security alerts
+```
+
+---
+
+# 22. Security Requirements
+
+## SR-01 — Confidentiality
+
+Sensitive company communication must be protected against unauthorized disclosure.
+
+Controls:
+
+- Intranet restriction
+- Authentication
+- Authorization
+- TLS
+- Authenticated encryption where applicable
+
+---
+
+## SR-02 — Integrity
+
+Files must be verifiable after transmission/storage.
+
+Controls:
+
+- SHA-256 file hash
+- Authenticated encryption
+- Post-decryption verification
+- Integrity failure logging
+
+---
+
+## SR-03 — Authentication
+
+Only valid company users may access the system.
+
+Controls:
+
+- Company-created accounts
+- Strong password hashing
+- Session management
+- Session expiration
+- Device/session limits
+
+---
+
+## SR-04 — Accountability
+
+Security-relevant actions must be attributable to users/devices.
+
+Controls:
+
+- Audit logs
+- User identity
+- Device/session information
+- Timestamps
+- PCAP metadata
+
+---
+
+## SR-05 — Availability
+
+The service should remain usable under normal and controlled abnormal conditions.
+
+Controls:
+
+- Session limits
+- Request rate limiting
+- File-size limits
+- Connection timeouts
+- Health checks
+- Resource monitoring
+
+---
+
+# 23. Security Analysis Metrics
+
+The following metrics should be included selectively rather than forcing every metric into the application.
+
+## 23.1 Information Entropy — Recommended
+
+Information entropy is useful for evaluating the randomness/distribution of encrypted data. NIST also treats entropy as an important concept in evaluating entropy sources for random-bit generation.
+
+For this project, entropy can be measured on:
+
+- Original image bytes
+- Encrypted image/file bytes
+
+Purpose:
+
+```text
+Original data
+      ↓
+Entropy measurement
+
+Encrypted data
+      ↓
+Entropy measurement
+```
+
+A substantial increase toward a high-entropy ciphertext distribution can support the claim that the ciphertext does not preserve obvious plaintext statistical structure.
+
+This should be treated as **supporting analysis**, not proof that AES-GCM is secure.
+
+---
+
+# 24. NPCR — Optional Image Security Analysis
+
+Assuming "NICR" refers to **NPCR — Number of Pixels Change Rate**.
+
+NPCR measures how many pixel positions differ between two cipher images generated from very slightly different plaintext images. It is primarily an image-encryption sensitivity metric.
+
+For this project, NPCR is relevant only if the team performs a dedicated image-encryption experiment.
+
+Example:
+
+```text
+Image A
+ ↓
+Change one pixel
+ ↓
+Image B
+
+Encrypt both
+ ↓       ↓
+C1       C2
+ ↓       ↓
+NPCR comparison
+```
+
+This tests how sensitive the encryption output is to a small change in the input.
+
+### Recommendation
+
+**Do not make NPCR a core product requirement.**
+
+If the project uses standard AES-GCM for file encryption, NPCR is not necessary to prove the security of the system.
+
+It can be included in the **research/evaluation section** as an optional image-encryption experiment.
+
+---
+
+# 25. UACI — Optional Image Security Analysis
+
+UACI measures the average intensity difference between two corresponding cipher images and is commonly paired with NPCR for image-encryption sensitivity analysis.
+
+Experimental workflow:
+
+```text
+Original Image
+      │
+      ├── Encrypt → Cipher Image 1
+      │
+      └── Slightly Modified Image
+                 ↓
+              Encrypt
+                 ↓
+           Cipher Image 2
+
+                 ↓
+             NPCR + UACI
+```
+
+### Recommendation
+
+UACI should be treated exactly like NPCR:
+
+**Optional research metric, not a core product requirement.**
+
+It becomes highly relevant if the project develops or evaluates a custom image-encryption algorithm.
+
+---
+
+# 26. Correlation Coefficient — Optional / Supporting Metric
+
+Correlation coefficient measures the statistical relationship between neighboring pixels.
+
+A strong image-encryption experiment generally aims to remove the strong adjacent-pixel relationships present in many natural images.
+
+The project can compare:
+
+```text
+Original Image
+      ↓
+Adjacent pixel correlation
+
+Encrypted Image
+      ↓
+Adjacent pixel correlation
+```
+
+Expected observation:
+
+```text
+Original image
+→ relatively strong neighboring-pixel correlation
+
+Encrypted image
+→ substantially reduced correlation
+```
+
+### Recommendation
+
+Use this only as an **image encryption analysis metric**.
+
+Do not present it as a general security metric for the entire intranet.
+
+---
+
+# 27. MSE — Recommended for Recovery Validation
+
+Mean Squared Error measures the average squared pixel difference between two images.
+
+For this project, MSE is useful for comparing:
+
+```text
+Original Image
+      vs
+Decrypted Image
+```
+
+A low MSE indicates that the decrypted image closely reconstructs the original.
+
+This is much more meaningful for the project than comparing the original image with its encrypted representation.
+
+---
+
+# 28. PSNR — Recommended for Recovery Validation
+
+PSNR is derived from MSE and is commonly used to evaluate reconstruction quality. Higher PSNR generally means greater similarity between the original and reconstructed image.
+
+The correct experiment is:
+
+```text
+Original Image
+      ↓
+Encrypt
+      ↓
+Transmit
+      ↓
+Decrypt
+      ↓
+Recovered Image
+      ↓
+PSNR + MSE
+      ↓
+Recovery Quality
+```
+
+Expected result:
+
+```text
+MSE → approximately 0
+PSNR → very high
+```
+
+for a lossless encryption/decryption pipeline.
+
+### Important
+
+Do **not** use a high PSNR between the original and encrypted image as evidence of strong encryption. For this project, PSNR is primarily a **decryption/reconstruction correctness metric**.
+
+---
+
+# 29. Recommended Metrics Matrix
+
+| Metric | Include? | Purpose |
+|---|---|---|
+| **SHA-256** | ✅ Core | File integrity |
+| **MSE** | ✅ Recommended | Decrypted-image fidelity |
+| **PSNR** | ✅ Recommended | Decrypted-image quality |
+| **Information Entropy** | ✅ Recommended | Ciphertext randomness/supporting analysis |
+| **Correlation coefficient** | 🟡 Optional | Image encryption statistical analysis |
+| **NPCR** | 🟡 Optional | Image encryption sensitivity |
+| **UACI** | 🟡 Optional | Image encryption sensitivity |
+| **Latency** | ✅ Core | Communication efficiency |
+| **Throughput** | ✅ Core | File transfer efficiency |
+| **CPU usage** | ✅ Recommended | Encryption/transfer overhead |
+| **Memory usage** | 🟡 Recommended | Resource efficiency |
+| **Packet overhead** | ✅ Recommended | Network efficiency |
+
+---
+
+# 30. Performance Requirements
+
+The system should measure security overhead rather than only claiming that the system is efficient.
+
+Measurements should include:
+
+### Authentication
+
+- Login response time
+- Session creation time
+
+### File processing
+
+- Hashing time
+- Encryption time
+- Decryption time
+- Verification time
+
+### Network
+
+- Upload time
+- Download time
+- End-to-end latency
+- Throughput
+- Packet overhead
+
+### Resource usage
+
+- CPU utilization
+- Memory utilization
+
+Testing should be performed for different file sizes.
+
+Example:
+
+```text
+10 KB
+100 KB
+1 MB
+10 MB
+50 MB
+100 MB
+```
+
+---
+
+# 31. Compatibility Testing
+
+The platform should be tested across:
+
+### Desktop
+
+- Windows
+- Linux/macOS where available
+
+### Mobile
+
+- Android
+- iOS
+
+Testing should cover:
+
+- Login
+- Messaging
+- File upload
+- File download
+- Image preview
+- Session expiration
+- Logout
+- Access control
+
+The primary goal is a responsive web interface that does not require separate application installations.
+
+---
+
+# 32. Failure Handling
+
+The system must gracefully handle:
+
+### Invalid login
+
+```text
+Login failed
+```
+
+### Expired session
+
+```text
+Session expired
+Please log in again
+```
+
+### Third-device login
+
+```text
+Maximum active sessions reached
+```
+
+### Invalid file
+
+```text
+File rejected:
+Signature does not match declared type
+```
+
+### Integrity failure
+
+```text
+Integrity verification failed
+File unavailable
+Security event recorded
+```
+
+### Unauthorized resource
+
+```text
+403 Forbidden
+```
+
+### Network failure
+
+```text
+Transfer interrupted
+Retry available
+```
+
+---
+
+# 33. Core User Workflow
+
+## Login
+
+```text
+User
+ ↓
+Login
+ ↓
+Authentication
+ ↓
+Session validation
+ ↓
+Role retrieval
+ ↓
+Dashboard
+```
+
+## Share file
+
+```text
+Select recipient
+ ↓
+Authorization check
+ ↓
+Select file
+ ↓
+Extension check
+ ↓
+MIME check
+ ↓
+Magic-byte check
+ ↓
+Size check
+ ↓
+Compatibility check
+ ↓
+Hash
+ ↓
+Encrypt
+ ↓
+TLS transmission
+ ↓
+Store/share
+ ↓
+Audit log
+```
+
+## Receive file
+
+```text
+Receive
+ ↓
+Authenticate session
+ ↓
+Authorization check
+ ↓
+Decrypt
+ ↓
+Authentication/integrity verification
+ ↓
+Hash verification
+ ↓
+Compare with original hash
+ ↓
+File available
+ ↓
+Audit log
+```
+
+---
+
+# 34. Network Security Workflow
+
+```text
+Company Communication
+        ↓
+Network Traffic
+        ↓
+Wireshark Capture
+        ↓
+PCAP / PCAPNG
+        ↓
+PyShark
+        ↓
+Packet Extraction
+        ↓
+Filtering / Analysis
+        ↓
+SQLite
+        ↓
+Security Dashboard
+```
+
+---
+
+# 35. Database Requirements
+
+The initial database should contain at least the following logical entities.
+
+## Users
+
+```text
+user_id
+name
+company_profile
+department
+role
+password_hash
+status
+created_at
+```
+
+## Sessions
+
+```text
+session_id
+user_id
+device_id
+created_at
+last_activity
+expires_at
+status
+```
+
+## Files
+
+```text
+file_id
+filename
+size
+mime_type
+detected_type
+sha256
+owner
+created_at
+status
+```
+
+## Shares
+
+```text
+share_id
+file_id
+sender_id
+recipient_id
+shared_at
+status
+```
+
+## Audit Logs
+
+```text
+event_id
+user_id
+device_id
+event_type
+resource
+timestamp
+source_ip
+result
+```
+
+## Network Packets
+
+```text
+packet_id
+timestamp
+source_ip
+destination_ip
+protocol
+source_port
+destination_port
+packet_size
+flags
+risk_score
+```
+
+---
+
+# 36. MVP Scope
+
+The minimum viable product must contain:
+
+- Company user accounts
+- Admin role
+- At least one additional role
+- Password hashing
+- Login/logout
+- Two-device session limit
+- Session expiration
+- Inactivity timeout
+- Role-based authorization
+- Company-only resource access
+- Text messaging
+- Document sharing
+- Image sharing
+- File extension validation
+- MIME validation
+- File signature validation
+- SHA-256 integrity verification
+- Secure transport
+- Audit logging
+- Responsive PC/mobile interface
+- Wireshark traffic capture
+- PyShark analysis
+- PCAP → SQLite pipeline
+
+---
+
+# 37. Phase 2 Features
+
+After the MVP:
+
+- Advanced administrator dashboard
+- Security alerts
+- Traffic anomaly detection
+- Device management
+- File versioning
+- Advanced permission groups
+- File preview
+- More detailed performance analytics
+- Automated PCAP analysis
+- Optional audio/video support
+- Advanced image-security experiments
+
+---
+
+# 38. Success Criteria
+
+The project will be considered successful if it can demonstrate:
+
+### Authentication
+
+A valid company user can log in while an unauthorized user cannot.
+
+### Session Security
+
+A user cannot maintain more than two active device sessions.
+
+### Authorization
+
+A user cannot access resources outside their assigned permissions.
+
+### File Security
+
+An invalid or disguised file is rejected.
+
+### Integrity
+
+A modified file fails verification.
+
+### Confidentiality
+
+Captured network traffic does not expose protected application content.
+
+### Accountability
+
+User actions are recorded with timestamps and identities.
+
+### Compatibility
+
+The same application is usable from both PC and mobile.
+
+### PCAP Analysis
+
+A captured PCAP can be processed and represented in SQLite.
+
+### Traffic Analysis
+
+Wireshark and PyShark can demonstrate and analyze actual intranet traffic.
+
+### Performance
+
+The system can quantify the overhead introduced by its security mechanisms.
+
+---
+
+# 39. Final Product Definition
+
+The final system should be understood as:
+
+> **A private, role-based company intranet that enables authenticated employees to exchange text, documents, and images while enforcing company-only access, controlled multi-device sessions, file-type validation, integrity verification, secure communication, cross-device compatibility, and complete security auditing. Its network security component captures and analyzes intranet traffic using Wireshark and PyShark and converts PCAP data into SQLite for structured security analysis.**
+
+The project therefore has **two connected layers**:
+
+```text
+┌─────────────────────────────────────────┐
+│          SECURE INTRANET                │
+│                                         │
+│ Authentication                          │
+│ Authorization                           │
+│ Session Management                      │
+│ Text / File Sharing                     │
+│ File Validation                         │
+│ Integrity Verification                  │
+│ Compatibility                           │
+│ Audit Logging                           │
+└──────────────────┬──────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│       SECURITY ANALYSIS LAYER           │
+│                                         │
+│ Wireshark                               │
+│ PyShark                                 │
+│ PCAP Analysis                           │
+│ PCAP → SQLite                           │
+│ Traffic Analysis                        │
+│ Security Metrics                        │
+└─────────────────────────────────────────┘
+```
+
+The image-specific metrics **NPCR, UACI, correlation coefficient, entropy, MSE and PSNR should be positioned as an evaluation/research layer rather than core product functionality**. In particular, NPCR/UACI/correlation are most meaningful when evaluating a dedicated image-encryption scheme, while MSE/PSNR are useful for verifying lossless image recovery after encryption/decryption. This avoids artificially adding mathematical metrics that do not meaningfully evaluate the overall intranet.

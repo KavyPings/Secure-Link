@@ -1,0 +1,2 @@
+pyshark
+# plus Wireshark (tshark) installed on the machine; Npcap on Windows for live capture
