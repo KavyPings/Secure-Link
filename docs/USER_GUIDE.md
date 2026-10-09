@@ -102,7 +102,7 @@ You can open only files you sent or that were shared with you. Anything else ret
 Administrators see **Admin** and **Dashboard** tabs. Every administrative action is written to the audit log.
 
 ### Users
-- **Create a user:** fill in User ID (also their login name), name, department, role and an initial password (minimum 8 characters), then click **Create user**. Give the password to the employee through a safe channel.
+- **Create a user:** fill in User ID (also their login name: 3–64 letters, numbers, `.`, `-` or `_`, no spaces, e.g. `fin_carl`), name, department, role and an initial password (minimum 8 characters), then click **Create user**. Give the password to the employee through a safe channel.
 - **Change role:** use the role drop-down in the user's row. It takes effect on their next request.
 - **Disable:** blocks the account and signs out all its sessions. **Enable** reactivates it.
 - **Unlock:** a *locked* account (5 failed logins) shows **Unlock**, which also resets the counter.

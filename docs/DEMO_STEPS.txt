@@ -1,0 +1,421 @@
+SECURELINK - DEMO STEPS
+=======================
+
+How to read this file:
+  - Do the steps in order.
+  - "SEE:" is what should appear on screen.
+  - "SAY:" is one simple sentence to tell the audience.
+  - Text inside [ ] is something you type or click.
+  - <IP> means your laptop's Wi-Fi address (you find it in step A3).
+
+You will use 4 windows plus your phone:
+  - Chrome          -> logged in as the boss (admin)
+  - Edge            -> logged in as Anna (HR)
+  - Phone           -> logged in as Bob (HR)
+  - Chrome Incognito-> logged in as Carl (Finance)
+Why separate windows? One browser can only be logged in as one person at a time.
+
+Use the same password for every demo user, for example:  Demo#2026pass
+
+
+=====================================================================
+PART A - GET READY (do this the day before)
+=====================================================================
+
+A1. Install Npcap from https://npcap.com and restart the laptop.
+    (Wireshark needs this to record network traffic.)
+
+A2. Connect the laptop and the phone to the SAME Wi-Fi.
+    If the phone cannot open the site later, use the phone's hotspot
+    and connect the laptop to it instead.
+
+A3. Find your laptop's address. In PowerShell, in the project folder, type:
+        ipconfig
+    Write down the "IPv4 Address" under Wi-Fi. This is your <IP>.
+
+A4. Make the security certificate match that address. Type:
+        .venv\Scripts\python scripts\gen_cert.py <IP>
+
+A5. Make the phone trust the site:
+    - Send the file  certs\ca.crt  to your phone and install it.
+    - Android: Settings > Security > Install a certificate > CA certificate.
+    - iPhone: open the file, install the profile, then go to
+      Settings > General > About > Certificate Trust Settings and switch it on.
+
+A6. Let the phone reach the laptop. Open PowerShell AS ADMINISTRATOR and type:
+        New-NetFirewallRule -DisplayName "SecureLink demo" -Direction Inbound -Protocol TCP -LocalPort 8443,8080 -Action Allow
+
+A7. Start the app. In PowerShell, in the project folder, type:
+        .venv\Scripts\python backend\run.py
+    Leave this window open. This is the "SERVER WINDOW".
+    To stop the app later: click this window and press Ctrl+C.
+
+A8. In Chrome go to  https://localhost:8443  and log in as admin.
+    Click [Admin] > [Users] and create these people
+    (fill in the form and click [Create user] for each):
+        hr_anna   - Anna Rao  - Human Resources - role HR
+        hr_bob    - Bob Mehta - Human Resources - role HR
+        dev_dan   - Dan Iyer  - Engineering     - role Developer
+    Do NOT create Carl yet. You will do that live.
+
+A9. Get these files ready in one folder:
+    - Any PDF, renamed to       hr_salaries.pdf
+    - A copy of it, renamed to  hr_appraisals.pdf
+    - Any photo (.jpg or .png), named team_photo.jpg
+    - The fake "virus" file: open a second PowerShell window in the
+      project folder (this is the "SCRIPT WINDOW") and type:
+        .venv\Scripts\python scripts\make_spoofed_file.py
+      It creates  demo_files\invoice.pdf  (a program pretending to be a PDF).
+
+A10. Practise once from Part B to Part E.
+
+
+=====================================================================
+PART B - JUST BEFORE THE DEMO (5 minutes)
+=====================================================================
+
+B1. Start the app in the SERVER WINDOW (see A7) if it isn't running.
+B2. Chrome: open  https://localhost:8443  and log in as  admin
+B3. Edge:   open  https://localhost:8443  and log in as  hr_anna
+B4. Phone:  open  https://<IP>:8443       and log in as  hr_bob
+B5. Open Wireshark. Don't start recording yet.
+B6. In Chrome AND Edge: right-click the address bar and tick
+    [Always show full URLs], so the audience sees the full https:// address.
+
+
+=====================================================================
+PART C - THE APP (about 20 minutes)
+=====================================================================
+
+--- C1. Only the company can create accounts ---
+
+1. Point at the login page.
+   SEE: There is no "Sign up" button.
+   SAY: "Nobody can register themselves. Only the admin creates accounts."
+
+2. Chrome (admin): click [Admin] > [Users]. Create:
+        fin_carl - Carl Shah - Finance - role Finance
+   SEE: "User fin_carl created".
+
+3. Open a Chrome Incognito window (Ctrl+Shift+N). Go to https://localhost:8443
+   Log in as fin_carl with a WRONG password.
+   SEE: "Login failed"
+   SAY: "Wrong passwords are refused, and the message gives no hints."
+
+4. Log in as fin_carl with the RIGHT password.
+   SEE: Carl is logged in. He has no Admin tab.
+   SAY: "Passwords are never stored. Only a scrambled fingerprint (hash) is kept."
+
+
+--- C2. Works on PC and phone ---
+
+1. Hold up the phone next to the laptop.
+   SAY: "Same app on phone and computer. Nothing to install."
+
+
+--- C3. Chat messages ---
+
+1. Edge (Anna): click [Messages] > [Bob Mehta]. Type "Payroll file coming" and click [Send].
+   SEE: One tick  ✓  = sent.
+
+2. Wait 5 seconds. Don't touch the phone.
+   SEE: Two ticks  ✓✓  = delivered to Bob's phone.
+
+3. Phone (Bob): tap [Anna Rao].
+   SEE: The message. In Edge it now says  ✓✓ read
+   SAY: "Messages are stored locked (encrypted). We can see sent, delivered and read."
+
+4. Phone (Bob): type a reply and send it.
+   SEE: It appears in Edge.
+
+
+--- C4. Sharing files safely ---
+
+1. Edge (Anna): click [Files]. Choose hr_salaries.pdf, tick [Bob Mehta], click [Upload & share].
+   SEE: "Shared with hr_bob"
+   SAY: "Before accepting a file, the app checks its name, its type and its
+         real contents, then locks it (encrypts it) before saving."
+
+2. Do the same with team_photo.jpg (to Bob).
+
+3. THE ATTACK: upload demo_files\invoice.pdf to Bob.
+   SEE: "File rejected: Signature does not match declared type"
+   SAY: "This is really a program pretending to be a PDF. The app looks
+         inside the file, not just at its name, so it catches the trick."
+
+4. Chrome (admin): [Admin] > [File types]. Untick [Allowed] next to .xlsx.
+   Edge (Anna): try uploading any .xlsx file.
+   SEE: "File type '.xlsx' is not allowed"
+   SAY: "The admin decides which file types are allowed."
+   Then tick .xlsx back on in Chrome.
+
+
+--- C5. Detecting changed (tampered) files ---
+
+1. Phone (Bob): [Files] > under "Received files", tap [Download] on team_photo.jpg.
+   SEE: "Integrity Verified ✓" and the photo appears.
+   SAY: "The phone checks the file's fingerprint. It's exactly what Anna sent."
+
+2. SCRIPT WINDOW: type
+        .venv\Scripts\python scripts\tamper_file.py hr_salaries.pdf
+   SEE: "Flipped 1 bit ..."
+   SAY: "I just secretly changed one tiny piece of the stored file, like a hacker would."
+
+3. Phone (Bob): tap [Download] on hr_salaries.pdf.
+   SEE: "Integrity verification failed. File unavailable. Security event recorded."
+   SAY: "Even a one-bit change is caught. The file is blocked and the admin is told."
+
+
+--- C6. People only see what they're allowed to see ---
+
+1. Edge (Anna): upload hr_appraisals.pdf to Bob ONLY.
+
+2. Edge (Anna): [Files] > "Files you shared" > hr_appraisals.pdf.
+   Under the file you see its full address, e.g.
+        https://localhost:8443/api/files/8280b8fa98da4dabb8dc7b2d486a90b6
+   Click [Copy] next to it.
+   SAY: "This is the file's address. Let's see if Carl can open it."
+
+3. Incognito (Carl): click the address bar, paste (Ctrl+V), press Enter.
+   SEE: {"detail":"403 Forbidden"}
+   SAY: "Carl is a real logged-in employee, but this HR file isn't his,
+         so he is refused."
+
+4. Incognito (Carl): in the address bar type
+        https://localhost:8443/api/admin/users
+   SEE: {"detail":"403 Forbidden"}
+   SAY: "He can't open admin pages either."
+
+5. Chrome (admin): [Admin] > [Roles]. In the Finance row, untick "upload file", click [Save].
+   Incognito (Carl): press F5, click [Files].
+   SEE: The upload box is gone for Carl.
+   SAY: "The admin controls what each role can do."
+   Then tick "upload file" back on for Finance and click [Save].
+
+
+--- C7. Maximum two devices per person ---
+
+1. Close ALL Incognito windows. Open a NEW Incognito window and log in as hr_bob.
+   (Bob now has 2 devices: phone + this window.)
+
+2. Open Edge InPrivate (Ctrl+Shift+N in Edge). Log in as hr_bob again.
+   SEE: "Maximum active sessions reached"
+   SAY: "Each person can be logged in on only two devices at once."
+
+3. Phone (Bob): tap [Sessions].
+   SEE: The two devices.
+   Tap [Revoke] on the "Chrome on Windows" one.
+   SAY: "Bob can kick out a device he doesn't trust."
+
+4. Edge InPrivate: log in as hr_bob again.
+   SEE: It works now.
+
+5. Chrome (admin): [Admin] > [Sessions]. Click [Revoke all for user] on an hr_bob row.
+   SAY: "The admin can log someone out everywhere at once."
+   Close the InPrivate window. Log Bob back in on the phone.
+
+
+--- C8. Too many wrong passwords locks the account ---
+
+1. Open Edge InPrivate. Log in as dev_dan with a wrong password 5 times.
+   Go slowly: the app also blocks more than 10 login tries per minute.
+   SEE: "Login failed" each time.
+
+2. Now type the RIGHT password.
+   SEE: Still "Login failed".
+   SAY: "After 5 wrong tries the account is locked, even for the right password."
+
+3. Chrome (admin): [Admin] > [Users].
+   SEE: dev_dan shows "locked". Click [Unlock].
+   SAY: "Only the admin can unlock it."
+
+
+--- C9. Outsiders are blocked ---
+
+1. SERVER WINDOW: press Ctrl+C, then type:
+        $env:SL_TRUSTED_NETWORKS="127.0.0.1/32,::1/128"; .venv\Scripts\python backend\run.py
+   SAY: "Now I tell the app that only this laptop is inside the company.
+         The phone counts as an outsider."
+
+2. Phone: refresh the page.
+   SEE: "Access restricted to the company network"
+
+3. Chrome (admin): [Admin] > [Audit log]. Pick [EXTERNAL_ACCESS_ATTEMPT], click [Filter].
+   SEE: The phone's address, the time, the page it tried, and "BLOCKED".
+   SAY: "Outsiders are refused and every attempt is recorded."
+
+4. SERVER WINDOW: press Ctrl+C, then type:
+        Remove-Item Env:SL_TRUSTED_NETWORKS
+
+
+--- C10. Logged out automatically when idle ---
+
+1. SERVER WINDOW: type
+        $env:SL_INACTIVITY_TIMEOUT_MIN="1"; .venv\Scripts\python backend\run.py
+   SAY: "Normally you're logged out after 30 minutes of doing nothing.
+         For the demo I've set it to 1 minute."
+
+2. Edge (Anna): click [Messages]. Then don't touch Edge.
+
+3. Wait about 70 seconds (talk about the audit log in Chrome meanwhile).
+   SEE: Edge switches to the login page with
+        "Session expired. Please log in again"
+
+4. SERVER WINDOW: press Ctrl+C, then type:
+        Remove-Item Env:SL_INACTIVITY_TIMEOUT_MIN; .venv\Scripts\python backend\run.py
+   Log Anna back in (Edge) and Bob back in (phone).
+
+
+--- C11. Everything is recorded ---
+
+1. Chrome (admin): [Admin] > [Audit log] (no filter).
+   SEE: Every action from the demo: logins, failed logins, uploads,
+        downloads, blocked files, blocked people.
+   SAY: "Every important action is recorded: who, when, from where, and
+         whether it worked. File contents are never stored here."
+
+2. Click [Dashboard].
+   SEE: Number boxes. Orange boxes are security problems
+        (failed logins, blocked files, tampered files...).
+   SAY: "The admin sees the security situation at a glance."
+
+
+=====================================================================
+PART D - SPYING ON THE NETWORK (about 10 minutes)
+=====================================================================
+Idea: we record the Wi-Fi traffic with Wireshark, first WITHOUT protection
+and then WITH protection, and compare.
+Use the PHONE for this part. The laptop can't record its own traffic to itself.
+
+--- D1. Without protection (unsafe mode) ---
+
+1. SERVER WINDOW: press Ctrl+C, then type:
+        $env:SL_TLS_ENABLED="false"; .venv\Scripts\python backend\run.py
+   SAY: "I'm switching off the encryption, only for this test."
+
+2. Wireshark: double-click your Wi-Fi adapter to start recording.
+
+3. Phone: open a PRIVATE / incognito tab and go to  http://<IP>:8080
+   (http, not https, and port 8080.)
+   Log in as hr_bob, send Anna a message, upload a photo.
+
+4. Wireshark: click the red square (stop).
+   [File] > [Save As], save as  before.pcapng  in the project folder.
+
+5. Wireshark: in the filter bar at the top type
+        http.request.method == "POST"
+   and press Enter. Right-click the line that ends with /api/auth/login >
+   [Follow] > [HTTP Stream].
+   SEE: Bob's password in plain readable text!
+   SAY: "Without encryption, anyone on the Wi-Fi can read passwords and messages."
+
+6. Close the popup. SCRIPT WINDOW: type
+        .venv\Scripts\python analysis\pcap_to_sqlite.py before.pcapng --label before --mode http --port 8080
+   SEE: "Imported capture ... plaintext_exposures=" with a number above 0.
+   SAY: "Our tool reads the recording and stores every packet in a database."
+
+7. SERVER WINDOW: press Ctrl+C, then type:
+        Remove-Item Env:SL_TLS_ENABLED; .venv\Scripts\python backend\run.py
+
+
+--- D2. With protection (normal mode) ---
+
+1. Wireshark: start recording again (if asked, choose "Continue without saving").
+
+2. Phone: normal tab, go to  https://<IP>:8443
+   Log in as hr_bob, send a message, upload a photo.
+
+3. Wireshark: stop. Save as  after.pcapng
+   Type  http  in the filter bar.
+   SEE: Nothing.
+   Type  tls  in the filter bar.
+   SEE: Only "Application Data". The contents are scrambled.
+   SAY: "With encryption, an eavesdropper only sees scrambled data."
+
+4. SCRIPT WINDOW: type
+        .venv\Scripts\python analysis\pcap_to_sqlite.py after.pcapng --label after
+   SEE: plaintext_exposures=0
+
+
+--- D3. Compare on the dashboard ---
+
+1. Chrome (admin): [Dashboard]. In the Network box, pick "before" in the drop-down.
+   SEE: "Plaintext exposures" is more than 0.
+
+2. Pick "after".
+   SEE: "Plaintext exposures" is 0.
+   SAY: "Proof that our encryption hides passwords and messages."
+
+3. Scroll down to "Imported captures".
+   SAY: "We can also see the extra network cost (Overhead) that security adds."
+
+
+--- D4. (Optional) A fake attacker ---
+Only if you have a second laptop on the same Wi-Fi.
+Copy  scripts\attack_sim.py  and  certs\ca.crt  to it, and on it run:
+        pip install requests
+        python attack_sim.py --server https://<IP>:8443 --ca ca.crt
+Do this while Wireshark is recording in D2 (between steps 2 and 3).
+Afterwards the Dashboard's "Security alerts" will list: repeated failed
+connections, too many requests, and probing of other ports.
+SAY: "The tool spots attack patterns automatically."
+
+
+=====================================================================
+PART E - SECURITY MEASUREMENTS (about 3 minutes)
+=====================================================================
+
+1. SCRIPT WINDOW: type
+        .venv\Scripts\python evaluation\image_metrics.py team_photo.jpg --save-dir evaluation\results
+   (Use the full path to your photo if it's in another folder.)
+   SEE: A list of numbers.
+   SAY (keep it simple):
+     - "Entropy is close to 8 for the encrypted photo: it looks completely random."
+     - "Correlation is close to 0: no pattern from the original photo survives."
+     - "MSE 0 and PSNR infinite: after unlocking, the photo is exactly the original."
+
+2. Open the folder  evaluation\results  and show  team_photo_cipher.png
+   SEE: Pure static/noise.
+   SAY: "This is what the encrypted photo looks like."
+
+
+=====================================================================
+FINISH - WHAT WE PROVED
+=====================================================================
+  - Only real employees can log in ............................ C1, C8
+  - Max two devices per person ................................ C7
+  - People can't open what isn't theirs ....................... C6
+  - Fake / disguised files are rejected ....................... C4
+  - Changed files are caught .................................. C5
+  - Network spies can't read our data ......................... D1-D3
+  - Every action is recorded .................................. C11
+  - Works on PC and phone ..................................... C2
+  - Network recordings are analysed and stored in a database .. D1, D2
+  - Security cost is measured ................................. D3, E
+
+
+=====================================================================
+IF SOMETHING GOES WRONG
+=====================================================================
+  Phone can't open the site
+      -> Same Wi-Fi? Did you do A6? Try the phone hotspot (A2).
+
+  "Your connection is not private"
+      -> Certificate not installed (A5), or the IP changed: redo A4 and restart the app.
+
+  "Too many requests"
+      -> You went too fast. Wait 1 minute.
+
+  A window shows the wrong person
+      -> One browser = one person. Use a different browser or an Incognito window.
+
+  Wireshark records nothing
+      -> Did you install Npcap (A1)? Did you pick the Wi-Fi adapter? Use the phone, not the laptop.
+
+  Forgot to switch a setting back
+      -> SERVER WINDOW: Ctrl+C, then type:
+         Remove-Item Env:SL_TRUSTED_NETWORKS, Env:SL_INACTIVITY_TIMEOUT_MIN, Env:SL_TLS_ENABLED -ErrorAction SilentlyContinue
+         then start the app again (A7).
+
+After the demo, remove the firewall rule (PowerShell as Administrator):
+        Remove-NetFirewallRule -DisplayName "SecureLink demo"

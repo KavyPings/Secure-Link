@@ -20,3 +20,4 @@ frontend/dist/
 sslkeys*.log
 evaluation/results/
 demo_files/
+demo/

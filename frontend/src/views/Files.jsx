@@ -120,6 +120,29 @@ function UploadCard({ onUploaded }) {
   );
 }
 
+// The file's API address. Opening it still requires login + owner/recipient access (403 otherwise).
+function FileAddress({ fileId }) {
+  const [copied, setCopied] = useState(false);
+  const address = `${window.location.origin}/api/files/${fileId}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(address); // only available over HTTPS / localhost
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("Copy this address:", address);
+    }
+  };
+  return (
+    <div className="muted small mono file-address">
+      <span>{address}</span>
+      <button type="button" className="ghost link-button" onClick={copy}>
+        {copied ? "Copied ✓" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
 function FileRow({ file, subtitle }) {
   const [state, setState] = useState(null); // {kind, text, url, preview}
 
@@ -163,6 +186,7 @@ function FileRow({ file, subtitle }) {
         <div className="muted small mono" title={file.sha256}>
           SHA-256 {file.sha256.slice(0, 24)}…
         </div>
+        <FileAddress fileId={file.file_id} />
       </div>
       <div className="file-actions">
         {!state?.url && (

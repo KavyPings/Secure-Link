@@ -1,0 +1,249 @@
+SECURELINK - COMMAND CHEAT SHEET
+================================
+
+How to use:
+  - Open PowerShell in the project folder:
+        C:\Users\kavyk\OneDrive\Desktop\Projects\ISL project
+  - Copy a command, replace anything in < > with your own value, press Enter.
+  - "SERVER WINDOW" = the PowerShell window where the app is running.
+    "SCRIPT WINDOW" = a second PowerShell window for everything else.
+  - Settings you set with  $env:...  stay in that window until you remove
+    them or close the window.
+
+Placeholders:
+  <IP>         your laptop's Wi-Fi address (see section 1)
+  <password>   a password, at least 8 characters
+  <filename>   a file name, e.g. hr_salaries.pdf
+  <user>       a User ID, e.g. hr_bob
+
+
+=====================================================================
+1. ONE-TIME SETUP
+=====================================================================
+
+Find your laptop's Wi-Fi address (look for "IPv4 Address"):
+    ipconfig
+
+Install the Python packages (only needed on a new computer):
+    python -m venv .venv
+    .venv\Scripts\python -m pip install -r backend\requirements.txt -r analysis\requirements.txt -r evaluation\requirements.txt
+
+Build the web pages (only after changing frontend code):
+    cd frontend; npm install; npm run build; cd ..
+
+Create the security certificate for your address:
+    .venv\Scripts\python scripts\gen_cert.py <IP>
+
+Trust the certificate on this Windows PC (then restart the browser):
+    certutil -addstore -user Root certs\ca.crt
+
+Let phones reach the app (PowerShell AS ADMINISTRATOR):
+    New-NetFirewallRule -DisplayName "SecureLink demo" -Direction Inbound -Protocol TCP -LocalPort 8443,8080 -Action Allow
+
+Remove that firewall rule after the demo (PowerShell AS ADMINISTRATOR):
+    Remove-NetFirewallRule -DisplayName "SecureLink demo"
+
+Create the first admin account (asks for the password):
+    .venv\Scripts\python scripts\init_admin.py --user-id admin --name "System Administrator"
+
+
+=====================================================================
+2. START AND STOP THE APP
+=====================================================================
+
+Start the app (normal, secure HTTPS on port 8443):
+    .venv\Scripts\python backend\run.py
+
+Stop the app:
+    Click the SERVER WINDOW and press Ctrl+C ONCE, then wait until it says
+    "Finished server process" (1-2 seconds).
+    (Pressing Ctrl+C twice forces an instant quit and prints a harmless
+     "KeyboardInterrupt / CancelledError" error. No data is lost.)
+
+Open the app:
+    On this laptop:   https://localhost:8443
+    On a phone:       https://<IP>:8443
+
+Check the app is alive (should print status ok):
+    .venv\Scripts\python -c "import requests;print(requests.get('https://127.0.0.1:8443/health',verify='certs/ca.crt').json())"
+
+
+=====================================================================
+3. START THE APP WITH SPECIAL SETTINGS (for demo steps)
+=====================================================================
+First stop the app (Ctrl+C), then run ONE of these in the SERVER WINDOW.
+
+Pretend this laptop is OUTSIDE the company (everything gets blocked):
+    $env:SL_TRUSTED_NETWORKS="192.168.99.0/24"; .venv\Scripts\python backend\run.py
+
+Only this laptop is inside the company (phones get blocked):
+    $env:SL_TRUSTED_NETWORKS="127.0.0.1/32,::1/128"; .venv\Scripts\python backend\run.py
+
+Log people out after 1 minute of doing nothing (normal is 30):
+    $env:SL_INACTIVITY_TIMEOUT_MIN="1"; .venv\Scripts\python backend\run.py
+
+Kick out the OLDEST device instead of refusing a 3rd device:
+    $env:SL_SESSION_LIMIT_POLICY="revoke_oldest"; .venv\Scripts\python backend\run.py
+
+UNSAFE mode without encryption (lab only, for the Wireshark "before" test).
+Opens on http://<IP>:8080 :
+    $env:SL_TLS_ENABLED="false"; .venv\Scripts\python backend\run.py
+
+Allow more requests per minute (if "Too many requests" gets in the way):
+    $env:SL_RATE_LIMIT_PER_MIN="300"; $env:SL_LOGIN_RATE_LIMIT_PER_MIN="30"; .venv\Scripts\python backend\run.py
+
+Use a separate, clean demo database (your normal data is not touched).
+Run this line in EVERY PowerShell window you use for the demo:
+    $env:SL_DATA_DIR="demo\data"; $env:SL_STORAGE_DIR="demo\storage"
+
+Go back to normal settings (then start the app again):
+    Remove-Item Env:SL_TRUSTED_NETWORKS, Env:SL_INACTIVITY_TIMEOUT_MIN, Env:SL_SESSION_LIMIT_POLICY, Env:SL_TLS_ENABLED, Env:SL_RATE_LIMIT_PER_MIN, Env:SL_LOGIN_RATE_LIMIT_PER_MIN -ErrorAction SilentlyContinue
+    .venv\Scripts\python backend\run.py
+
+
+=====================================================================
+4. FILE SECURITY DEMOS
+=====================================================================
+
+Make the fake "virus" file (a program pretending to be a PDF):
+    .venv\Scripts\python scripts\make_spoofed_file.py
+  -> creates demo_files\invoice.pdf. Upload it: it must be rejected.
+
+Make a fake file with another name, e.g. a "photo":
+    .venv\Scripts\python scripts\make_spoofed_file.py <filename>
+  example:
+    .venv\Scripts\python scripts\make_spoofed_file.py holiday.png
+
+List all stored files (to see their names and status):
+    .venv\Scripts\python scripts\tamper_file.py --list
+
+Secretly change one bit of a stored file (tampering):
+    .venv\Scripts\python scripts\tamper_file.py <filename>
+  example:
+    .venv\Scripts\python scripts\tamper_file.py hr_salaries.pdf
+  -> the next download of that file must fail the integrity check.
+
+
+=====================================================================
+5. LOOK UNDER THE HOOD (proof that data is protected)
+=====================================================================
+
+Show that passwords are stored only as hashes ($argon2id$...):
+    .venv\Scripts\python -c "import sqlite3;[print(r) for r in sqlite3.connect('backend/data/securelink.db').execute('select user_id,password_hash from users')]"
+
+Show the start of an ORIGINAL file (readable, starts with %PDF):
+    .venv\Scripts\python -c "print(open('demo_files/<filename>','rb').read(40))"
+
+Show the start of the newest STORED file (encrypted, random bytes):
+    .venv\Scripts\python -c "import glob,os;f=max(glob.glob('backend/storage/*.bin'),key=os.path.getmtime);print(f);print(open(f,'rb').read(40))"
+
+Show that chat messages are stored encrypted:
+    .venv\Scripts\python -c "import sqlite3;[print(s,'->',r,':',c[:24].hex()) for s,r,c in sqlite3.connect('backend/data/securelink.db').execute('select sender_id,recipient_id,ciphertext from messages')]"
+
+Show the last 15 entries of the audit log:
+    .venv\Scripts\python -c "import sqlite3;[print(r) for r in sqlite3.connect('backend/data/securelink.db').execute('select timestamp,user_id,event_type,resource,source_ip,result from audit_logs order by event_id desc limit 15')]"
+
+Show all users and their status (active / locked / disabled):
+    .venv\Scripts\python -c "import sqlite3;[print(r) for r in sqlite3.connect('backend/data/securelink.db').execute('select user_id,name,status,failed_logins from users')]"
+
+(If you use the clean demo database, replace  backend/data  with  demo/data
+ and  backend/storage  with  demo/storage  in the commands above.)
+
+
+=====================================================================
+6. NETWORK RECORDING AND ANALYSIS
+=====================================================================
+
+Make a SAMPLE recording (use this until Wireshark recording works):
+    .venv\Scripts\python scripts\make_sample_pcap.py
+
+Load the SAMPLE recording into the database:
+    .venv\Scripts\python analysis\pcap_to_sqlite.py sample_capture.pcap --label sample --mode http --port 8080 --server-ip 192.168.1.10
+
+Load a REAL Wireshark recording made with normal HTTPS:
+    .venv\Scripts\python analysis\pcap_to_sqlite.py <recording.pcapng> --label after
+  example:
+    .venv\Scripts\python analysis\pcap_to_sqlite.py after.pcapng --label after
+
+Load a REAL recording made in UNSAFE mode (no encryption, port 8080):
+    .venv\Scripts\python analysis\pcap_to_sqlite.py <recording.pcapng> --label before --mode http --port 8080
+  example:
+    .venv\Scripts\python analysis\pcap_to_sqlite.py before.pcapng --label before --mode http --port 8080
+
+If the server's address was different when you recorded, add:
+    --server-ip <IP>
+
+List all loaded recordings (shows their number = capture id):
+    .venv\Scripts\python -c "import sqlite3;[print(r) for r in sqlite3.connect('backend/data/securelink.db').execute('select capture_id,label,packet_count,connections,failed_connections,plaintext_exposures from captures')]"
+
+Show the first saved packets of the database:
+    .venv\Scripts\python -c "import sqlite3;[print(r) for r in sqlite3.connect('backend/data/securelink.db').execute('select source_ip,destination_ip,protocol,destination_port,packet_size,flags,risk_score from network_packets limit 10')]"
+
+Run the attack detection again on a recording (stricter thresholds):
+    .venv\Scripts\python analysis\detect.py <capture id> --failed-conn 3 --conn-rate 10 --auth-failures 3
+  example:
+    .venv\Scripts\python analysis\detect.py 1 --failed-conn 3 --conn-rate 10 --auth-failures 3
+
+Fake attacker against this laptop (blocks this laptop's browsers ~1 minute):
+    .venv\Scripts\python scripts\attack_sim.py --server https://127.0.0.1:8443 --ca certs\ca.crt
+
+Fake attacker from a SECOND laptop (copy attack_sim.py and ca.crt to it first):
+    pip install requests
+    python attack_sim.py --server https://<IP>:8443 --ca ca.crt
+
+Fake attacker against the UNSAFE mode server:
+    python attack_sim.py --server http://<IP>:8080
+
+(Optional) Record your own browser's HTTPS keys, to look inside encrypted
+traffic. Close Chrome completely first, then:
+    $env:SSLKEYLOGFILE="$PWD\sslkeys.log"; & "C:\Program Files\Google\Chrome\Application\chrome.exe"
+  and load the recording with:
+    .venv\Scripts\python analysis\pcap_to_sqlite.py after.pcapng --label after-keylog --keylog sslkeys.log
+  Delete sslkeys.log afterwards.
+
+
+=====================================================================
+7. SECURITY MEASUREMENTS
+=====================================================================
+
+Image measurements (entropy, correlation, MSE, PSNR, NPCR, UACI) and
+save the encrypted-looking picture:
+    .venv\Scripts\python evaluation\image_metrics.py <photo> --save-dir evaluation\results
+  example:
+    .venv\Scripts\python evaluation\image_metrics.py demo_files\team_photo.jpg --save-dir evaluation\results
+  -> open evaluation\results\team_photo_cipher.png to show the "noise" picture.
+
+Also add the numbers to a spreadsheet file:
+    .venv\Scripts\python evaluation\image_metrics.py <photo> --save-dir evaluation\results --csv evaluation\results\image_metrics.csv
+
+Quick speed test of encryption only (no app needed, a few seconds):
+    .venv\Scripts\python evaluation\benchmark.py --local-only
+
+Quick speed test through the app (up to 10 MB, about 30 seconds):
+    .venv\Scripts\python evaluation\benchmark.py --server https://127.0.0.1:8443 --ca certs\ca.crt --user <user> --password "<password>" --recipient <another user> --sizes 10,100,1024,10240 --reps 2
+
+FULL speed test (10 KB up to 100 MB, several minutes, uses ~500 MB disk):
+    .venv\Scripts\python evaluation\benchmark.py --server https://<IP>:8443 --ca certs\ca.crt --user <user> --password "<password>" --recipient <another user>
+
+Results are saved in:
+    evaluation\results\benchmark.csv
+    evaluation\results\benchmark_summary.csv
+
+
+=====================================================================
+8. RESET / CLEAN UP
+=====================================================================
+
+Throw away the clean demo database (stop the app first):
+    Remove-Item -Recurse -Force demo
+
+Remove generated demo files and recordings:
+    Remove-Item -Recurse -Force demo_files, sample_capture.pcap -ErrorAction SilentlyContinue
+
+Remove measurement results:
+    Remove-Item -Recurse -Force evaluation\results -ErrorAction SilentlyContinue
+
+WARNING - delete ALL real app data (users, messages, files, encryption key).
+Cannot be undone. Stop the app first:
+    Remove-Item -Recurse -Force backend\data, backend\storage
+  then create the admin again (section 1).

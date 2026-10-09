@@ -151,7 +151,7 @@ def main():
                     conn.executemany(sql, batch)
                 total += len(batch)
                 batch.clear()
-                print(f"\r{total} packets…", end="", flush=True)
+                print(f"\r{total} packets...", end="", flush=True)
         if batch:
             with transaction(conn):
                 conn.executemany(sql, batch)

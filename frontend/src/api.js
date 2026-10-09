@@ -57,7 +57,12 @@ export async function api(path, { method = "GET", body, background = false, raw 
     try {
       const detail = (await res.json()).detail;
       if (typeof detail === "string") message = detail;
-      else if (Array.isArray(detail) && detail[0]?.msg) message = `Invalid input: ${detail[0].msg}`;
+      else if (Array.isArray(detail) && detail[0]?.msg) {
+        // FastAPI validation error: name the field and avoid showing raw regex patterns
+        const field = String(detail[0].loc?.at(-1) ?? "input").replaceAll("_", " ");
+        const reason = detail[0].type === "string_pattern_mismatch" ? "contains characters that are not allowed" : detail[0].msg;
+        message = `Invalid ${field}: ${reason}`;
+      }
     } catch {
       /* non-JSON error body */
     }

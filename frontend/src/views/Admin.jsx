@@ -79,7 +79,19 @@ function Users({ me }) {
     <>
       <form className="card form-grid" onSubmit={create}>
         <h2 className="full">Create company user</h2>
-        <label>User ID<input value={form.user_id} onChange={set("user_id")} required /></label>
+        <label>
+          User ID (login name)
+          <input
+            value={form.user_id}
+            onChange={set("user_id")}
+            required
+            minLength={3}
+            maxLength={64}
+            pattern="[A-Za-z0-9_.\-]+"
+            title="3 to 64 characters: letters, numbers, dot (.), dash (-) or underscore (_). No spaces. Example: fin_carl"
+            placeholder="e.g. fin_carl"
+          />
+        </label>
         <label>Name<input value={form.name} onChange={set("name")} required /></label>
         <label>Department<input value={form.department} onChange={set("department")} required /></label>
         <label>

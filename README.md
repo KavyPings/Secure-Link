@@ -8,6 +8,9 @@ Kavy Khilrani (240911170), Ruchi Pawar (240911152). Guides: Dr. Akshay KC, Dr. S
 | Document | Purpose |
 |---|---|
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | How employees, administrators and security analysts use the system |
+| [docs/DEMO_STEPS.txt](docs/DEMO_STEPS.txt) | Simple step-by-step demo instructions (full demo) |
+| [docs/PROGRESS_DEMO.txt](docs/PROGRESS_DEMO.txt) | Progress demo: what can be shown and verified today, and what is left |
+| [docs/COMMANDS.txt](docs/COMMANDS.txt) | Copy-paste cheat sheet of every command (setup, server modes, demos, analysis, measurements, reset) |
 | [PLAN.md](PLAN.md) | Design plan, requirement traceability and **issues found in the PRD/synopsis** |
 | `prd.txt`, `SecureLink_Synopsis.pdf` | Source requirements |
 
@@ -227,6 +230,7 @@ This measures login and session-creation time, message latency, and hashing, enc
 
 | Script | Demonstrates |
 |---|---|
+| `scripts/make_sample_pcap.py` | Writes a SAMPLE capture (login, message, attacker) so the PCAP → SQLite pipeline can be shown before live capture is available. Import with `--mode http --port 8080 --server-ip 192.168.1.10` |
 | `scripts/make_spoofed_file.py` | Builds `demo_files/invoice.pdf` with an executable (MZ) signature. Upload it and it is rejected: "Signature does not match declared type" |
 | `scripts/tamper_file.py <name>` | Flips one bit of a stored encrypted file. The next download fails the integrity check and is logged |
 | `scripts/attack_sim.py --server … --ca certs/ca.crt` | Failed-login burst, unauthorized API calls, connection burst (rate limiting), port probes, for the capture |
